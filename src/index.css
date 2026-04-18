@@ -57,18 +57,20 @@ body {
 }
 
 .site-header {
-  background: linear-gradient(135deg, var(--pk-green) 0%, var(--pk-green-mid) 48%, #0d3020 100%);
-  color: #fff;
+  /* Light bar so multi-color logo (greens + gold) reads clearly; brand green on accent strip */
+  background: linear-gradient(180deg, #fffef9 0%, #f7f4ec 55%, #f2efe6 100%);
+  color: var(--pk-green);
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
+  border-bottom: 3px solid var(--pk-green);
 }
 
 .site-header::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 80% 120% at 100% 0%, rgba(255, 203, 5, 0.12) 0%, transparent 45%);
+  background: radial-gradient(ellipse 90% 100% at 18% 0%, rgba(255, 203, 5, 0.18) 0%, transparent 42%);
   pointer-events: none;
 }
 
@@ -86,7 +88,12 @@ body {
   height: clamp(52px, 10vw, 72px);
   width: auto;
   object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+  display: block;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(10, 61, 38, 0.1);
+  box-shadow: 0 6px 20px rgba(10, 61, 38, 0.08);
 }
 
 .site-header__text {
@@ -103,14 +110,16 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   line-height: 1.15;
+  color: var(--pk-green);
+  text-shadow: none;
 }
 
 .site-header__product {
   font-size: 0.95rem;
   font-weight: 600;
-  opacity: 0.92;
   letter-spacing: 0.02em;
-  color: rgba(255, 248, 220, 0.95);
+  color: var(--pk-green-mid);
+  opacity: 0.95;
 }
 
 .page {
