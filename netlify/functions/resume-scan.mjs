@@ -1,9 +1,11 @@
 /**
- * Server-only Groq call. Set GROQ_API_KEY in Netlify → Site configuration → Environment variables.
- * Optional: GROQ_MODEL (default: llama-3.1-8b-instant for speed on free-tier timeouts).
+ * One Groq chat/completions call per request — body can include 1–8 resumes.
+ * Set GROQ_API_KEY in Netlify. Optional: GROQ_MODEL (default llama-3.1-8b-instant).
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const JD_MAX = 60_000;
+const PER_RESUME_MAX = 10_000;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +27,28 @@ function stripJsonFence(s) {
   return m ? m[1].trim() : t;
 }
 
+function normalizeCandidates(body) {
+  const jd = typeof body.jd === "string" ? body.jd : "";
+  const out = [];
+  if (Array.isArray(body.candidates)) {
+    for (let i = 0; i < body.candidates.length; i++) {
+      const c = body.candidates[i];
+      if (!c || typeof c !== "object") continue;
+      const resume = typeof c.resume === "string" ? c.resume : "";
+      if (!resume.trim()) continue;
+      const name =
+        typeof c.name === "string" && c.name.trim()
+          ? c.name.trim()
+          : `Resume ${out.length + 1}`;
+      out.push({ name, resume: resume.trim() });
+    }
+  }
+  if (out.length === 0 && typeof body.resume === "string" && body.resume.trim()) {
+    out.push({ name: "Resume", resume: body.resume.trim() });
+  }
+  return { jd, candidates: out.slice(0, 8) };
+}
+
 export const handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: cors, body: "" };
@@ -42,42 +66,48 @@ export const handler = async (event) => {
     });
   }
 
-  let jd;
-  let resume;
+  let body;
   try {
-    const body = JSON.parse(event.body || "{}");
-    jd = typeof body.jd === "string" ? body.jd : "";
-    resume = typeof body.resume === "string" ? body.resume : "";
+    body = JSON.parse(event.body || "{}");
   } catch {
     return json(400, { error: "Invalid JSON body" });
   }
 
-  if (!jd.trim() || !resume.trim()) {
-    return json(400, { error: "jd and resume must be non-empty strings" });
+  const { jd, candidates } = normalizeCandidates(body);
+  if (!jd.trim() || candidates.length === 0) {
+    return json(400, {
+      error: "Need jd and at least one resume (candidates[].resume or legacy resume string).",
+    });
   }
 
-  const model =
-    process.env.GROQ_MODEL?.trim() || "llama-3.1-8b-instant";
+  const model = process.env.GROQ_MODEL?.trim() || "llama-3.1-8b-instant";
 
-  const system = `You are a recruiting assistant. Given a job description (JD) and resume text, extract structured data.
+  const system = `You are a recruiting assistant. You receive ONE job description (JD) and MULTIPLE resumes (each has a "name" and "text").
 
-Rules:
+For EACH resume independently:
 - Infer skills/tools/technologies/domains explicitly or strongly implied in the JD. Include soft skills only if the JD stresses them as requirements.
-- For each JD skill, set mandatory=true if the JD treats it as required/must-have/non-negotiable; use false for nice-to-have.
-- minYears: if the JD states a minimum years of experience for that skill (or same bullet/sentence), put an integer; else null.
-- resumeYears: estimate total years the candidate likely used that skill in paid roles, using employment dates and bullets. Use decimals like 2.5. If unclear, null.
-- meetsMandatoryExperience: for skills where mandatory=true and minYears is set: true if resumeYears >= minYears, false if below or resumeYears unknown; if minYears is null, true if skill appears in resume, false if not, else null when ambiguous.
-- rows: one row per skill that appears in JD or resume (union). Include jdMandatory and jdMinYears copied from JD analysis for that skill.
-- verdict: "shortlist" only if every mandatory skill is present on resume AND every minYears requirement is met; "missing_mandatory_skills" if any mandatory skill missing from resume; "not_enough_experience" if all mandatory skills appear but at least one fails min years.
-- summary: 2-5 short bullet strings explaining the decision.
+- For each JD skill in that resume's analysis, set mandatory=true if the JD treats it as required/must-have; else false.
+- minYears: integer if the JD states a minimum years for that skill near that requirement; else null.
+- resumeYears: estimate years that candidate used that skill in paid roles from dates/bullets; decimals ok; else null.
+- meetsMandatoryExperience: for mandatory=true and minYears set: true if resumeYears >= minYears; false if below or unknown; if minYears null: true if skill on resume, false if not, else null.
+- rows: union of skills appearing in JD or that resume.
+- verdict per resume: "shortlist" only if every mandatory skill is on that resume AND minYears met; "missing_mandatory_skills" if any mandatory missing; "not_enough_experience" if all mandatory present but a year requirement fails.
+- summary: 2-5 short strings for that resume.
 
-Output ONLY valid JSON (no markdown) with this exact shape:
-{"jdSkills":[{"skill":"string","mandatory":bool,"minYears":number|null}],"resumeSkills":["string"],"rows":[{"skill":"string","inJd":bool,"inResume":bool,"jdMandatory":bool,"jdMinYears":number|null,"resumeYears":number|null,"meetsMandatoryExperience":bool|null,"notes":"string"}],"verdict":"shortlist"|"missing_mandatory_skills"|"not_enough_experience","summary":["string"]}`;
+Return ONLY valid JSON (no markdown) with this exact top-level shape:
+{"candidates":[{"name":"string (must match input name)","scan":{"jdSkills":[{"skill":"string","mandatory":bool,"minYears":number|null}],"resumeSkills":["string"],"rows":[{"skill":"string","inJd":bool,"inResume":bool,"jdMandatory":bool,"jdMinYears":number|null,"resumeYears":number|null,"meetsMandatoryExperience":bool|null,"notes":"string"}],"verdict":"shortlist"|"missing_mandatory_skills"|"not_enough_experience","summary":["string"]}}]}
+
+You MUST output exactly one object in "candidates" for each input resume, in the SAME ORDER, with the SAME "name" strings.`;
 
   const user = JSON.stringify({
-    jobDescription: jd.slice(0, 120_000),
-    resume: resume.slice(0, 120_000),
+    jobDescription: jd.slice(0, JD_MAX),
+    resumes: candidates.map((c) => ({
+      name: c.name,
+      text: c.resume.slice(0, PER_RESUME_MAX),
+    })),
   });
+
+  const maxTokens = Math.min(16384, 2200 + candidates.length * 1400);
 
   let groqRes;
   try {
@@ -90,7 +120,7 @@ Output ONLY valid JSON (no markdown) with this exact shape:
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: 4096,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -125,9 +155,9 @@ Output ONLY valid JSON (no markdown) with this exact shape:
     return json(502, { error: "groq_empty_content", groqJson });
   }
 
-  let scan;
+  let parsed;
   try {
-    scan = JSON.parse(stripJsonFence(content));
+    parsed = JSON.parse(stripJsonFence(content));
   } catch (e) {
     return json(502, {
       error: "model_json_parse_error",
@@ -136,5 +166,26 @@ Output ONLY valid JSON (no markdown) with this exact shape:
     });
   }
 
-  return json(200, { scan, model });
+  if (!Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
+    return json(502, {
+      error: "model_missing_candidates",
+      snippet: content.slice(0, 1200),
+    });
+  }
+
+  const usage =
+    groqJson?.usage && typeof groqJson.usage === "object"
+      ? {
+          prompt_tokens: groqJson.usage.prompt_tokens ?? null,
+          completion_tokens: groqJson.usage.completion_tokens ?? null,
+          total_tokens: groqJson.usage.total_tokens ?? null,
+        }
+      : null;
+
+  return json(200, {
+    candidates: parsed.candidates,
+    model,
+    usage,
+    expectedCount: candidates.length,
+  });
 };
