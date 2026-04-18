@@ -1,0 +1,243 @@
+:root {
+  color-scheme: dark;
+  --bg: #0c0f14;
+  --panel: #121722;
+  --border: #243044;
+  --text: #e7edf7;
+  --muted: #9aa7bd;
+  --accent: #5b8cff;
+  --good: #3ecf8e;
+  --warn: #f0b429;
+  --bad: #ff6b6b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: radial-gradient(1200px 600px at 20% -10%, #1a2440 0%, var(--bg) 55%);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100%;
+}
+
+a {
+  color: var(--accent);
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 18px 60px;
+}
+
+.hero {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.6vw, 2.05rem);
+  letter-spacing: -0.02em;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 78ch;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 980px) {
+  .grid.two {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+label {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+textarea,
+input[type="file"] {
+  width: 100%;
+}
+
+textarea {
+  min-height: 170px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.88rem;
+}
+
+textarea:focus {
+  outline: 2px solid rgba(91, 140, 255, 0.35);
+  border-color: rgba(91, 140, 255, 0.55);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+button.primary {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 650;
+  background: linear-gradient(180deg, #6b9bff, #3f73ff);
+  color: #071022;
+  cursor: pointer;
+}
+
+button.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.banner {
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  background: rgba(240, 180, 41, 0.08);
+  color: #ffe6b0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 14px 0;
+  font-size: 0.92rem;
+}
+
+.error {
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffd1d1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  white-space: pre-wrap;
+}
+
+.verdict {
+  margin-top: 14px;
+  border-radius: 12px;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+}
+
+.verdict.shortlist {
+  border-color: rgba(62, 207, 142, 0.45);
+  background: rgba(62, 207, 142, 0.08);
+}
+
+.verdict.bad {
+  border-color: rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.verdict h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid rgba(36, 48, 68, 0.85);
+  padding: 10px 10px;
+  vertical-align: top;
+}
+
+th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 650;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tag.yes {
+  border-color: rgba(62, 207, 142, 0.45);
+  color: #cfffec;
+}
+
+.tag.no {
+  border-color: rgba(255, 107, 107, 0.45);
+  color: #ffd1d1;
+}
+
+.tag.maybe {
+  border-color: rgba(240, 180, 41, 0.45);
+  color: #ffecc8;
+}
+
+.mono {
+  font-family: var(--mono);
+}
