@@ -24,22 +24,22 @@ export async function extractTextFromDocx(file: File): Promise<string> {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
+/** Text from a single PDF or DOCX only (no paste merge). */
+export async function extractTextFromResumeFile(file: File): Promise<string> {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf")) return extractTextFromPdf(file);
+  if (lower.endsWith(".docx")) return extractTextFromDocx(file);
+  throw new Error("Unsupported file type. Use PDF or DOCX.");
+}
+
 export async function extractResumeText(
   file: File | null,
   pasted: string,
 ): Promise<string> {
   const paste = pasted.trim();
   if (file) {
-    const lower = file.name.toLowerCase();
-    if (lower.endsWith(".pdf")) {
-      const t = await extractTextFromPdf(file);
-      return [t, paste].filter(Boolean).join("\n\n");
-    }
-    if (lower.endsWith(".docx")) {
-      const t = await extractTextFromDocx(file);
-      return [t, paste].filter(Boolean).join("\n\n");
-    }
-    throw new Error("Unsupported file type. Use PDF or DOCX.");
+    const t = await extractTextFromResumeFile(file);
+    return [t, paste].filter(Boolean).join("\n\n");
   }
   if (!paste) throw new Error("Upload a resume or paste resume text.");
   return paste;

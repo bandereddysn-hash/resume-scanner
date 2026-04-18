@@ -73,13 +73,26 @@ export function coerceScanResult(raw: unknown): ScanResult {
   return { jdSkills, resumeSkills, rows, verdict, summary };
 }
 
+export type GroqTokenUsage = {
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+};
+
+export type GroqNamedScan = { name: string; scan: ScanResult };
+
 export type GroqScanResponse =
-  | { ok: true; scan: ScanResult; model?: string }
+  | {
+      ok: true;
+      candidates: GroqNamedScan[];
+      model?: string;
+      usage?: GroqTokenUsage | null;
+      expectedCount?: number;
+    }
   | {
       ok: false;
       status: number;
       error: string;
-      /** e.g. `missing_api_key` from the Netlify function */
       code?: string;
       details?: unknown;
     };
@@ -92,13 +105,34 @@ function scanUrl(): string {
   return `${base}/.netlify/functions/resume-scan`;
 }
 
-export async function scanWithGroq(jd: string, resume: string): Promise<GroqScanResponse> {
+function parseUsage(raw: unknown): GroqTokenUsage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const u = raw as Record<string, unknown>;
+  return {
+    prompt_tokens: typeof u.prompt_tokens === "number" ? u.prompt_tokens : null,
+    completion_tokens:
+      typeof u.completion_tokens === "number" ? u.completion_tokens : null,
+    total_tokens: typeof u.total_tokens === "number" ? u.total_tokens : null,
+  };
+}
+
+/**
+ * One HTTP request → one Groq completion. Pass 1–8 resumes as separate candidates.
+ */
+export async function scanWithGroq(
+  jd: string,
+  candidates: { name: string; text: string }[],
+): Promise<GroqScanResponse> {
+  if (candidates.length === 0) {
+    return { ok: false, status: 400, error: "No resumes to scan" };
+  }
+
   let res: Response;
   try {
     res = await fetch(scanUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jd, resume }),
+      body: JSON.stringify({ jd, candidates }),
     });
   } catch (e) {
     return {
@@ -133,13 +167,32 @@ export async function scanWithGroq(jd: string, resume: string): Promise<GroqScan
   }
 
   const d = data as Record<string, unknown>;
-  if (!d.scan) {
-    return { ok: false, status: 502, error: "Missing scan payload", details: data };
+  const rawList = d.candidates;
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return {
+      ok: false,
+      status: 502,
+      error: "Missing candidates in response",
+      details: data,
+    };
   }
+
+  const out: GroqNamedScan[] = rawList.map((item, i) => {
+    const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    return {
+      name: asStr(o.name, `Resume ${i + 1}`),
+      scan: coerceScanResult(o.scan ?? {}),
+    };
+  });
+
+  const expectedCount =
+    typeof d.expectedCount === "number" ? d.expectedCount : undefined;
 
   return {
     ok: true,
-    scan: coerceScanResult(d.scan),
+    candidates: out,
     model: typeof d.model === "string" ? d.model : undefined,
+    usage: parseUsage(d.usage),
+    expectedCount,
   };
 }
